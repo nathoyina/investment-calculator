@@ -398,6 +398,43 @@ test("an automatic buy on Moomoo cannot stay, because neither market is availabl
   assert.deepEqual(choices.map((choice) => choice.value), ["both", "sgd"]);
 });
 
+test("a United States answer uses the S&P 500 fund instead of the world fund", () => {
+  const london = suggestPlan({
+    loss: 0.8,
+    horizon: "long",
+    habit: "recurring",
+    fx: "both",
+    market: "us",
+  });
+  const singapore = suggestPlan({
+    loss: 0.6,
+    horizon: "long",
+    habit: "manual",
+    fx: "sgd",
+    market: "us",
+  });
+  const calm = suggestPlan({
+    loss: 0.2,
+    horizon: "long",
+    habit: "recurring",
+    fx: "sgd",
+    market: "us",
+  });
+  assert.equal(london.headline, "55% XDPU and 45% CNDX");
+  assert.equal(london.market, "us");
+  assert.match(`${london.message} ${london.notes.join(" ")}`, /0\.03%/);
+  assert.equal(singapore.headline, "90% XUS and 10% XND");
+  assert.equal(singapore.riskWeight, 0.1);
+  assert.match(singapore.funds.find((fund) => fund.ticker === "XUS").lines.join(" "), /S&P 500/);
+  assert.equal(calm.headline, "90% AGGU and 10% XDPU");
+  assert.equal(calm.venueId, "lse");
+  assert.match(calm.broker.why, /XDPU/);
+  const rates = planRates({ venueId: "sgx", windowId: "y10", riskWeight: 0, subtractFees: true, market: "us" });
+  assert.equal(rates.core.etf, "XUS");
+  assert.ok(Math.abs(rates.annual - (0.1533 - 0.0003)) < 1e-12);
+  assert.ok(Math.abs(rates.maxLoss - 0.5678) < 1e-12);
+});
+
 test("Nasdaq cumulative figures annualize to the rates in the model", () => {
   const ann = (cumulative, years) => Math.pow(1 + cumulative, 1 / years) - 1;
   assert.ok(Math.abs(ann(1.0665, 3) - 0.2737) < 0.0002);

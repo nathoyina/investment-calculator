@@ -5,7 +5,14 @@ const $ = (id) => document.getElementById(id);
 const VENUE_NOTES = {
   lse: "London, in US dollars: VWRA and CNDX. Both are based in Ireland, so US dividends inside the fund are withheld at 15%, and the holding generally sits outside US estate tax. You convert Singapore dollars on each buy. The core includes emerging markets. These lines are large, so the gap between buy and sell prices is usually tight.",
   sgx: "Singapore exchange, in Singapore dollars: XWR and XND. They are based in Ireland too, so US withholding and estate-tax treatment match the London funds. You skip the currency conversion, but the Singapore-dollar price still moves with the US dollar. The core leaves out emerging markets. The gap between buy and sell prices can be wider, and the US market is closed while the Singapore exchange is open.",
+  "us:lse": "London, in US dollars: XDPU and CNDX. Both are based in Ireland, so US dividends inside the fund are withheld at 15%, and the holding generally sits outside US estate tax. You convert Singapore dollars on each buy. The main fund is the S&P 500, so it leaves out Europe, Japan, and the rest.",
+  "us:sgx": "Singapore exchange, in Singapore dollars: XUS and XND. They are based in Ireland too, so US withholding and estate-tax treatment match the London fund. You skip the currency conversion, but the Singapore-dollar price still moves with the US dollar. The main fund is the S&P 500, so it leaves out Europe, Japan, and the rest. The gap between buy and sell prices can be wider, and the US market is closed while the Singapore exchange is open.",
 };
+
+function venueNote(venue, market) {
+  if (market === "us") return VENUE_NOTES[`us:${venue}`];
+  return VENUE_NOTES[venue];
+}
 
 const HABIT_NOTES = {
   recurring:
@@ -35,6 +42,16 @@ const QUESTIONS = [
       { value: "under7", label: "Under 7 years" },
       { value: "mid", label: "7 to 15 years" },
       { value: "long", label: "15 years or more" },
+    ],
+  },
+  {
+    kicker: "Market",
+    title: "Where should the main fund invest?",
+    help: "The fee is the small part. The US fund costs 0.03% a year. The world fund on the Singapore exchange costs 0.12%. The choice is the countries in the fund.",
+    key: "market",
+    options: [
+      { value: "global", label: "Worldwide", detail: "US companies, plus Europe, Japan, and other developed markets" },
+      { value: "us", label: "United States", detail: "The S&P 500 only. You skip Europe, Japan, and the rest" },
     ],
   },
   {
@@ -126,6 +143,7 @@ const state = {
   venue: "lse",
   habit: "recurring",
   mix: "equity",
+  market: "global",
 };
 
 const quiz = {
@@ -379,6 +397,7 @@ function openCalculator(plan, { scroll = true } = {}) {
   $("monthly").value = "1000";
   $("start").value = "0";
   state.mix = plan.bondWeight ? "bond" : "equity";
+  state.market = plan.market === "us" ? "us" : "global";
   state.venue = plan.venueId;
   state.habit = plan.habit;
   $("calculator").hidden = false;
@@ -404,6 +423,7 @@ function finishQuiz() {
       horizon: quiz.answers.horizon,
       habit: quiz.answers.habit,
       fx: quiz.answers.fx,
+      market: quiz.answers.market,
       currentBroker: selectedBrokers().length ? selectedBrokers() : "none",
       brokerPreference: selectedBrokers().some((id) => id !== "none") ? quiz.answers.prefer : "change",
     }),
@@ -427,12 +447,14 @@ function render() {
       equityWeight: shareWeight,
       windowId: $("window").value,
       subtractFees: $("fees").checked,
+      market: state.market,
     })
     : planRates({
       venueId: state.venue,
       windowId: $("window").value,
       riskWeight,
       subtractFees: $("fees").checked,
+      market: state.market,
     });
   const path = project({
     start: readNumber($("start"), 0),
@@ -456,7 +478,7 @@ function render() {
     $("pair").textContent = `${rates.bond.detail}. Share fund: ${rates.equity.detail}.`;
     $("extreme-detail").textContent =
       `${rates.bond.etf} ${rates.bond.lossWhen} −${formatPct(rates.bond.maxLoss)}, best year ${rates.bond.gainWhen} +${formatPct(rates.bond.maxGain)}. ` +
-      `${rates.equity.etf} ${rates.coreExtreme.lossWhen} −${formatPct(rates.coreExtreme.maxLoss)}, best year ${rates.coreExtreme.gainWhen} +${formatPct(rates.coreExtreme.maxGain)}. ` +
+      `${rates.equity.etf} ${rates.coreExtreme.lossWhen} −${formatPct(rates.coreExtreme.maxLoss)}, ${rates.coreExtreme.gainLabel || `best year ${rates.coreExtreme.gainWhen}`} +${formatPct(rates.coreExtreme.maxGain)}. ` +
       "Weighted by this mix. The worst periods were not the same months.";
   } else {
     $("core-pct").textContent = `${Math.round(rates.coreW * 100)}%`;
@@ -465,7 +487,7 @@ function render() {
     $("risk-name").textContent = rates.riskFund.etf;
     $("pair").textContent = `${rates.core.detail}. Higher-risk sleeve: ${rates.riskFund.detail}.`;
     $("extreme-detail").textContent =
-      `${rates.core.etf} ${rates.coreExtreme.lossWhen} −${formatPct(rates.coreExtreme.maxLoss)}, best year ${rates.coreExtreme.gainWhen} +${formatPct(rates.coreExtreme.maxGain)}. ` +
+      `${rates.core.etf} ${rates.coreExtreme.lossWhen} −${formatPct(rates.coreExtreme.maxLoss)}, ${rates.coreExtreme.gainLabel || `best year ${rates.coreExtreme.gainWhen}`} +${formatPct(rates.coreExtreme.maxGain)}. ` +
       `Nasdaq-100 ${rates.nasdaqExtreme.lossWhen} −${formatPct(rates.nasdaqExtreme.maxLoss)}, best year ${rates.nasdaqExtreme.gainWhen} +${formatPct(rates.nasdaqExtreme.maxGain)}. ` +
       "Weighted by this mix. The worst periods were not the same months.";
   }
@@ -478,11 +500,15 @@ function render() {
   $("gain-fill").style.width = `${Math.min(100, rates.maxGain * 100)}%`;
 
   $("venue-note").textContent = bondMix
-    ? "London, in US dollars: AGGU and VWRA. AGGU is the global bond fund. Both are based in Ireland. You convert Singapore dollars on each buy. Choosing the Singapore exchange leaves the bond fund behind, because it is not listed there."
-    : VENUE_NOTES[state.venue];
+    ? `London, in US dollars: AGGU and ${rates.equity.etf}. AGGU is the global bond fund. Both are based in Ireland. You convert Singapore dollars on each buy. Choosing the Singapore exchange leaves the bond fund behind, because it is not listed there.`
+    : venueNote(state.venue, state.market);
   $("habit-note").textContent = habitNote();
+  $("long-note").textContent = rates.longUsesTenYear
+    ? "The since-1988 choice uses the 10-year S&P 500 return for both sleeves, because the 30 Sep 2026 factsheet used here has no since-1988 S&P 500 figure. The Nasdaq sleeve gets no extra return in this stress case."
+    : "The since-1988 rate is applied to both sleeves. The Nasdaq sleeve gets no extra return in this stress case.";
   setPressed("venue", state.venue);
   setPressed("habit", state.habit);
+  setPressed("market", state.market);
 
   $("window-warning").hidden = !rates.caution;
   $("long-note").hidden = rates.windowKey !== "long";

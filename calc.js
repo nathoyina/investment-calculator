@@ -87,6 +87,7 @@ const MAX_RISK = 0.45;
 const EXTREMES = {
   allworld: { maxLoss: 0.5806, maxGain: 0.273, lossWhen: "Oct 2007–Mar 2009", gainWhen: "2019" },
   developed: { maxLoss: 0.5746, maxGain: 0.284, lossWhen: "Oct 2007–Mar 2009", gainWhen: "2019" },
+  us: { maxLoss: 0.5678, maxGain: 0.3149, lossWhen: "9 Oct 2007–9 Mar 2009", gainWhen: "2019", gainLabel: "2019 total return" },
   nasdaq: { maxLoss: 0.83, maxGain: 1.0195, lossWhen: "Mar 2000–Oct 2002", gainWhen: "1999" },
 };
 
@@ -114,25 +115,66 @@ const BOND = {
   yieldToWorst: 0.0447,
 };
 
+/**
+ * S&P 500 index total return, SPDR S&P 500 factsheet, 30 Sep 2026.
+ * 3-year 22.89%, 5-year 13.79%, 10-year 15.33%. That factsheet has no
+ * since-1988 figure, so the long window reuses the 10-year return.
+ * Max loss is the S&P 500 price index, 1,565.15 on 9 Oct 2007 to 676.53
+ * on 9 Mar 2009, −56.78% (Wikipedia index table). 2019 total return is
+ * 31.49% (Slickcharts). It is the upside used here, not the highest year.
+ */
+const US_CORE = {
+  id: "us",
+  label: "US large-cap core",
+  ter: 0.0003,
+  returns: { y3: 0.2289, y5: 0.1379, y10: 0.1533, long: 0.1533 },
+  longUsesTenYear: true,
+};
+
+const US_LISTINGS = {
+  lse: {
+    etf: "XDPU",
+    detail: "Xtrackers S&P 500 fund, accumulating, priced in US dollars, listed in London",
+  },
+  sgx: {
+    etf: "XUS",
+    detail: "Xtrackers S&P 500 fund, accumulating, listed on the Singapore exchange, traded in Singapore dollars",
+  },
+};
+
 const VENUES = {
   lse: { id: "lse", coreId: "allworld", label: "Ireland-domiciled" },
   sgx: { id: "sgx", coreId: "developed", label: "SGX" },
 };
+
+function coreFor({ coreId, venueId, market }) {
+  if (market === "us" && US_LISTINGS[venueId]) {
+    return { ...US_CORE, ...US_LISTINGS[venueId] };
+  }
+  const venue = VENUES[venueId];
+  return CORES[venue ? venue.coreId : coreId] ?? CORES.allworld;
+}
+
+function riskFundFor(venueId, core) {
+  if (venueId === "sgx") return RISK_FUND.developed;
+  if (venueId === "lse") return RISK_FUND.allworld;
+  return RISK_FUND[core.id];
+}
 
 function clamp(n, min, max) {
   if (!Number.isFinite(n)) return min;
   return Math.min(max, Math.max(min, n));
 }
 
-function planRates({ coreId, venueId, windowId, riskWeight, subtractFees }) {
+function planRates({ coreId, venueId, windowId, riskWeight, subtractFees, market }) {
   const venue = VENUES[venueId];
-  const core = CORES[venue ? venue.coreId : coreId] ?? CORES.allworld;
+  const core = coreFor({ coreId, venueId, market });
   const windowKey = WINDOWS[windowId] ? windowId : "y10";
   const riskW = clamp(riskWeight, 0, MAX_RISK);
   const coreW = 1 - riskW;
   const coreR = core.returns[windowKey];
   const riskR = windowKey === "long" ? coreR : RISK_RETURNS[windowKey];
-  const riskFund = RISK_FUND[core.id];
+  const riskFund = riskFundFor(venueId, core);
   const gross = coreW * coreR + riskW * riskR;
   const ter = coreW * core.ter + riskW * riskFund.ter;
   const annual = subtractFees ? gross - ter : gross;
@@ -157,6 +199,7 @@ function planRates({ coreId, venueId, windowId, riskWeight, subtractFees }) {
     maxGain,
     coreExtreme,
     nasdaqExtreme,
+    longUsesTenYear: windowKey === "long" && core.longUsesTenYear === true,
   };
 }
 
@@ -246,10 +289,11 @@ function sleeveWeights() {
   return weights;
 }
 
-function bondMixRates({ equityWeight, windowId, subtractFees }) {
+function bondMixRates({ equityWeight, windowId, subtractFees, market }) {
   const equityW = clamp(equityWeight, 0, 1);
   const bondW = 1 - equityW;
-  const equity = CORES.allworld;
+  const equity = coreFor({ venueId: "lse", market });
+  const extreme = EXTREMES[equity.id];
   const windowKey = WINDOWS[windowId] ? windowId : "y10";
   const bondNet = windowKey === "y3" ? BOND.netY3 : windowKey === "y5" ? BOND.netY5 : BOND.netSince;
   const equityGross = equity.returns[windowKey];
@@ -262,19 +306,20 @@ function bondMixRates({ equityWeight, windowId, subtractFees }) {
     annual,
     gross,
     ter,
-    maxLoss: bondW * BOND.maxLoss + equityW * EXTREMES.allworld.maxLoss,
-    maxGain: bondW * BOND.maxGain + equityW * EXTREMES.allworld.maxGain,
+    maxLoss: bondW * BOND.maxLoss + equityW * extreme.maxLoss,
+    maxGain: bondW * BOND.maxGain + equityW * extreme.maxGain,
     equity,
     bond: BOND,
-    coreExtreme: EXTREMES.allworld,
+    coreExtreme: extreme,
     windowKey,
     caution: WINDOWS[windowKey].caution,
     bondSinceLaunch: windowKey !== "y3" && windowKey !== "y5",
+    longUsesTenYear: false,
   };
 }
 
-function calmMix(equityWeight) {
-  const rates = bondMixRates({ equityWeight, windowId: "y10", subtractFees: true });
+function calmMix(equityWeight, market) {
+  const rates = bondMixRates({ equityWeight, windowId: "y10", subtractFees: true, market });
   return {
     bondW: rates.bondW,
     equityW: rates.equityW,
@@ -286,15 +331,28 @@ function calmMix(equityWeight) {
   };
 }
 
-function nasdaqLines(ter) {
+function nasdaqLines(ter, market) {
   const extreme = EXTREMES.nasdaq;
+  const overlap = market === "us"
+    ? "The main fund is already the S&P 500, so this sleeve is the extra technology weight inside the US market."
+    : "The world fund already holds the US market, so this plan does not add a separate S&P 500 fund.";
   return [
-    `Yearly fee ${formatTer(ter, 2)}. It holds about 100 of the largest companies on the Nasdaq exchange, excluding financial companies. The world fund already holds the US market, so this plan does not add a separate S&P 500 fund.`,
+    `Yearly fee ${formatTer(ter, 2)}. It holds about 100 of the largest companies on the Nasdaq exchange, excluding financial companies. ${overlap}`,
     `The rates are the Nasdaq-100 price index through ${AS_OF}, so dividends are not in the number: ${formatPct(RISK_RETURNS.y10)} a year over 10 years. The deepest fall, using the QQQ price, was ${formatPct(extreme.maxLoss)}, from ${extreme.lossWhen}. The best calendar year was ${extreme.gainWhen}, up ${formatPct(extreme.maxGain)}.`,
   ];
 }
 
-function fundProfile(ticker, weight) {
+function usFundLines(listing) {
+  const core = US_CORE;
+  const extreme = EXTREMES.us;
+  return [
+    `Dividends stay inside the fund. ${listing} The fund is based in Ireland, so US dividends inside it are withheld at 15%, and the holding generally sits outside US estate tax. Yearly fee ${formatTer(core.ter, 2)}.`,
+    "It holds the S&P 500, about 500 of the largest US companies. It leaves out Europe, Japan, and the rest. On 30 Sep 2026 the MSCI World index, which the world fund follows, was already 72.9% United States. The world fund on the Singapore exchange costs 0.12% a year.",
+    `The planning rate uses the S&P 500 index total return through ${AS_OF}: ${formatPct(core.returns.y10)} a year over 10 years. The since-1988 choice uses that same 10-year figure, because the factsheet has no since-1988 number. The price index fell ${formatPct(extreme.maxLoss)} from ${extreme.lossWhen}. The 2019 total return was ${formatPct(extreme.maxGain)}.`,
+  ];
+}
+
+function fundProfile(ticker, weight, market) {
   const profiles = {
     VWRA: () => {
       const core = CORES.allworld;
@@ -324,15 +382,25 @@ function fundProfile(ticker, weight) {
       name: "iShares Nasdaq 100 fund",
       lines: [
         "Dividends stay inside the fund. It is priced in US dollars and listed in London. The fund is based in Ireland.",
-        ...nasdaqLines(RISK_FUND.allworld.ter),
+        ...nasdaqLines(RISK_FUND.allworld.ter, market),
       ],
     }),
     XND: () => ({
       name: "Xtrackers Nasdaq 100 fund",
       lines: [
-        "Dividends stay inside the fund. Listed on the Singapore exchange and traded in Singapore dollars. The fund is based in Ireland. The Singapore-dollar price still moves with the US dollar. As of 31 Aug 2026, technology was 66.85% of this fund. The world fund's technology share on that same date was 35.49%.",
-        ...nasdaqLines(RISK_FUND.developed.ter),
+        market === "us"
+          ? "Dividends stay inside the fund. Listed on the Singapore exchange and traded in Singapore dollars. The fund is based in Ireland. The Singapore-dollar price still moves with the US dollar. As of 31 Aug 2026, technology was 66.85% of this fund. That is the technology tilt on top of the S&P 500."
+          : "Dividends stay inside the fund. Listed on the Singapore exchange and traded in Singapore dollars. The fund is based in Ireland. The Singapore-dollar price still moves with the US dollar. As of 31 Aug 2026, technology was 66.85% of this fund. The world fund's technology share on that same date was 35.49%.",
+        ...nasdaqLines(RISK_FUND.developed.ter, market),
       ],
+    }),
+    XUS: () => ({
+      name: "Xtrackers S&P 500 fund",
+      lines: usFundLines("Listed on the Singapore exchange and traded in Singapore dollars. Paying in Singapore dollars does not stop the price moving with the US dollar."),
+    }),
+    XDPU: () => ({
+      name: "Xtrackers S&P 500 fund",
+      lines: usFundLines("It is priced in US dollars and listed in London."),
     }),
     AGGU: () => ({
       name: "iShares Core Global Aggregate Bond fund",
@@ -348,18 +416,18 @@ function fundProfile(ticker, weight) {
   return { ticker, weight, name: built.name, lines: built.lines };
 }
 
-function fundsFor(parts) {
+function fundsFor(parts, market) {
   return parts
     .filter((part) => part.weight > 0)
     .sort((a, b) => b.weight - a.weight)
-    .map((part) => fundProfile(part.ticker, part.weight));
+    .map((part) => fundProfile(part.ticker, part.weight, market));
 }
 
-function calmEquityWeight(lossLimit) {
+function calmEquityWeight(lossLimit, market) {
   let best = null;
   for (let pct = 0; pct <= 100; pct += 5) {
     const equityW = pct / 100;
-    if (calmMix(equityW).maxLoss <= lossLimit + 1e-12) best = equityW;
+    if (calmMix(equityW, market).maxLoss <= lossLimit + 1e-12) best = equityW;
   }
   return best;
 }
@@ -414,18 +482,20 @@ const BROKER_BLOCK = {
   "other:any": "This list does not have fees for that brokerage, so staying would mean checking the ticker yourself.",
 };
 
-function pickBroker(habit, venueId, bond) {
+function pickBroker(habit, venueId, bond, names = {}) {
+  const coreName = names.core || (venueId === "sgx" ? "XWR" : "VWRA");
+  const riskName = names.risk || (venueId === "sgx" ? "XND" : "CNDX");
   if (bond && venueId === "lse") {
     const automatic = habit === "recurring";
     return {
       id: "ibkr",
       name: "Interactive Brokers",
       why: automatic
-        ? "AGGU and VWRA are London listings, and Interactive Brokers can buy both. An automatic buy is 0.05% with a £1 minimum and no platform fee. Keep cash in the account so it can run."
-        : "AGGU and VWRA are London listings, and Interactive Brokers can buy both. Each buy is 0.05% with a £1 minimum, no platform fee, and you can set a limit price.",
+        ? `AGGU and ${coreName} are London listings, and Interactive Brokers can buy both. An automatic buy is 0.05% with a £1 minimum and no platform fee. Keep cash in the account so it can run.`
+        : `AGGU and ${coreName} are London listings, and Interactive Brokers can buy both. Each buy is 0.05% with a £1 minimum, no platform fee, and you can set a limit price.`,
       alt: "",
       confirm: automatic
-        ? "Confirm AGGU and VWRA are eligible before the first automatic buy. Recurring buys need fractional shares turned on."
+        ? `Confirm AGGU and ${coreName} are eligible before the first automatic buy. Recurring buys need fractional shares turned on.`
         : "Confirm AGGU is on the London menu before the first buy.",
     };
   }
@@ -434,7 +504,7 @@ function pickBroker(habit, venueId, bond) {
       id: "fsm",
       name: "FSM Global",
       why: "Invest and forget fits FSM Global’s fund regular savings plan: 0% buy processing fee, no platform or custody fee, from S$50. That 0% is the automatic buy. A later manual London sale is 0.15% with a £15 minimum.",
-      alt: "If VWRA or CNDX is not on the menu, Interactive Brokers recurring is 0.05% with a £1 minimum and no platform fee.",
+      alt: `If ${coreName} or ${riskName} is not on the menu, Interactive Brokers recurring is 0.05% with a £1 minimum and no platform fee.`,
       confirm: "Confirm the ticker is on the plan before the first automatic buy.",
     };
   }
@@ -442,7 +512,7 @@ function pickBroker(habit, venueId, bond) {
     return {
       id: "fsm",
       name: "FSM Global",
-      why: "Invest and forget fits FSM Global’s regular savings plan for XWR and XND: 0% buy processing fee, no platform or custody fee, from S$50. A one-off Singapore-exchange fund trade is a flat S$3.80.",
+      why: `Invest and forget fits FSM Global’s regular savings plan for ${coreName} and ${riskName}: 0% buy processing fee, no platform or custody fee, from S$50. A one-off Singapore-exchange fund trade is a flat S$3.80.`,
       alt: "",
       confirm: "Confirm the ticker is on the plan before the first automatic buy.",
     };
@@ -541,7 +611,7 @@ function nameList(ids) {
  */
 function chooseBroker(habit, venueId, currentBroker, brokerPreference, options = {}) {
   const bond = options.bond === true && venueId === "lse";
-  const ideal = pickBroker(habit, venueId, bond);
+  const ideal = pickBroker(habit, venueId, bond, options.names);
   const ids = brokerIds(currentBroker);
   const keep = brokerPreference === "keep" && ids.length > 0;
   const path = `${habit}:${venueId}`;
@@ -624,8 +694,10 @@ function chooseBroker(habit, venueId, currentBroker, brokerPreference, options =
  * fx: both | sgd | none
  * currentBroker: none | fsm | ibkr | moomoo | longbridge | other, or a list of those
  * brokerPreference: keep | change
+ * market: global | us
  */
-function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPreference }) {
+function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPreference, market }) {
+  const marketId = market === "us" ? "us" : "global";
   const horizonSpec = HORIZONS[horizon] ?? HORIZONS.under7;
   const habitId = habit === "manual" ? "manual" : "recurring";
   const gainHope = GAIN_LABEL[gain] ? gain : 0.2;
@@ -687,7 +759,7 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
   }
 
   if (lossLimit <= 0.4) {
-    const equityW = calmEquityWeight(lossLimit);
+    const equityW = calmEquityWeight(lossLimit, marketId);
     if (equityW === null) {
       return {
         fits: false,
@@ -716,7 +788,7 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       };
     }
 
-    const mix = calmMix(equityW);
+    const mix = calmMix(equityW, marketId);
     const parts = [
       { pct: Math.round(mix.bondW * 100), etf: BOND.etf, ter: BOND.ter },
       { pct: Math.round(mix.equityW * 100), etf: mix.equity.etf, ter: mix.equity.ter },
@@ -735,6 +807,11 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
     notes.push(
       "The illustration uses the bond fund's return since November 2017 and the share fund's 10-year return. The bond fund's 5 years to 30 Sep 2026 were 0.10% a year, because 2022 was a fall of 11.65%.",
     );
+    if (marketId === "us") {
+      notes.push(
+        "You chose the United States, so the share fund is the S&P 500. You skip Europe, Japan, and the rest. Its yearly fee is 0.03%.",
+      );
+    }
     const projection = project({
       start: 0,
       monthly: 1000,
@@ -753,7 +830,8 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       bondWeight: mix.bondW,
       rateLabel: "Bond fund since Nov 2017, share fund over 10 years",
       headline,
-      funds: fundsFor(parts.map((part) => ({ ticker: part.etf, weight: part.pct }))),
+      market: marketId,
+      funds: fundsFor(parts.map((part) => ({ ticker: part.etf, weight: part.pct })), marketId),
       annual: mix.annual,
       longAnnual: null,
       ter: mix.ter,
@@ -765,7 +843,10 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       flatNote:
         "The S$ illustration assumes the exchange rate stays flat. A weaker US dollar would reduce that amount.",
       fundLine,
-      broker: chooseBroker(habitId, "lse", currentBroker, brokerPreference, { bond: true }),
+      broker: chooseBroker(habitId, "lse", currentBroker, brokerPreference, {
+        bond: true,
+        names: { core: mix.equity.etf },
+      }),
       gainCapped: false,
       horizonCapped: false,
     };
@@ -774,7 +855,7 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
   const venueId = fx === "sgd" ? "sgx" : "lse";
   const weights = sleeveWeights();
   const ratesAt = (riskWeight, windowId) =>
-    planRates({ venueId, windowId, riskWeight, subtractFees: true });
+    planRates({ venueId, windowId, riskWeight, subtractFees: true, market: marketId });
 
   let best = null;
   for (const weight of weights) {
@@ -847,6 +928,11 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       `A best year around ${GAIN_LABEL[gainHope]} has historically needed a heavier Nasdaq sleeve than this limit allows, so the safer weight stays.`,
     );
   }
+  if (marketId === "us") {
+    notes.push(
+      "You chose the United States, so the main fund is the S&P 500. You skip Europe, Japan, and the rest. Its yearly fee is 0.03%, against 0.12% for the world fund on the Singapore exchange.",
+    );
+  }
 
   const corePct = Math.round(rates.coreW * 100);
   const riskPct = Math.round(rates.riskW * 100);
@@ -875,10 +961,11 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       bondWeight: 0,
       rateLabel: "10-year average after fees",
       headline,
+      market: marketId,
       funds: fundsFor([
         { ticker: rates.core.etf, weight: corePct },
         { ticker: rates.riskFund.etf, weight: riskPct },
-      ]),
+      ], marketId),
     annual: rates.annual,
     longAnnual: longRates.annual,
     ter: rates.ter,
@@ -889,7 +976,9 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
     flatNote:
       "The S$ illustration assumes the exchange rate stays flat. A weaker US dollar would reduce that amount.",
     fundLine,
-    broker: chooseBroker(habitId, venueId, currentBroker, brokerPreference),
+    broker: chooseBroker(habitId, venueId, currentBroker, brokerPreference, {
+      names: { core: rates.core.etf, risk: rates.riskFund.etf },
+    }),
     gainCapped,
     horizonCapped: horizon === "under7" || horizonCapped,
   };
