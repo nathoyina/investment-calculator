@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equity plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f3d3e;
+      --ink: #eef5f0;
+      --deep: #0a2a2b;
+      --card: #134847;
+      --teal-700: #1b5a58;
+      --mint: #4fd1c5;
+      --body: rgba(238, 245, 240, 0.68);
+      --muted: rgba(238, 245, 240, 0.6);
+      --hairline: rgba(238, 245, 240, 0.08);
+      --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.7);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(520px 320px at 100% -8%, rgba(79, 209, 197, 0.18), transparent 62%),
+        radial-gradient(480px 340px at -8% 108%, rgba(79, 209, 197, 0.07), transparent 58%),
+        linear-gradient(180deg, #0a2a2b 0%, var(--bg) 32%, var(--bg) 100%);
+      color: var(--ink);
+      font-family: Inter, sans-serif;
+      font-optical-sizing: auto;
+      font-feature-settings: "ss01" on, "cv11" on;
+      font-size: 16px;
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+    main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 72px; }
+    h1, h2, .display {
+      font-weight: 680;
+      letter-spacing: -0.045em;
+      line-height: 1.08;
+      margin: 0;
+      color: var(--ink);
+    }
+    h1 { font-size: 40px; }
+    h2 { font-size: 22px; }
+    p { color: var(--body); }
+    .num { font-variant-numeric: tabular-nums; }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--mint);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .muted { color: var(--muted); }
+    .mint { color: var(--mint); }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .brand b { font-size: 15px; letter-spacing: -0.03em; font-weight: 680; }
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 10px;
+      background: rgba(79, 209, 197, 0.14);
+      display: grid;
+      place-items: center;
+    }
+    .mark span {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--mint);
+    }
+    .stage { max-width: 760px; }
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+      box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow);
+      padding: 22px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--teal-700), var(--card));
+      box-shadow: inset 0 0 0 1px var(--hairline);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .dots { display: flex; gap: 6px; }
+    .dots i {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(238, 245, 240, 0.28);
+      display: block;
+    }
+    .dots i.on { background: var(--mint); }
+    .dots i.done { background: rgba(79, 209, 197, 0.45); }
+    .quiz-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .lead { margin: 8px 0 0; max-width: 46ch; }
+    .answers { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+    .answer {
+      text-align: left;
+      background: var(--deep);
+      border: 0;
+      border-radius: 20px;
+      padding: 16px 18px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+    }
+    .answer:hover { background: #0e3334; }
+    .answer small { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; }
+    .answer[aria-pressed="true"] {
+      box-shadow: inset 0 0 0 1.5px var(--mint), 0 10px 30px -18px rgba(79, 209, 197, 0.7);
+    }
+    .check {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      box-shadow: inset 0 0 0 1px rgba(238, 245, 240, 0.2);
+    }
+    .answer[aria-pressed="true"] .check { background: var(--mint); box-shadow: none; }
+    .check svg { opacity: 0; }
+    .answer[aria-pressed="true"] .check svg { opacity: 1; }
+    .actions { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+    .pill {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: var(--mint);
+      color: var(--deep);
+      font-weight: 700;
+      box-shadow: 0 10px 30px -10px rgba(79, 209, 197, 0.5);
+    }
+    .pill:disabled { opacity: 0.4; cursor: default; }
+    .quiet {
+      border: 0;
+      background: transparent;
+      color: rgba(238, 245, 240, 0.72);
+      padding: 8px 2px;
+      font-weight: 560;
+    }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .stat {
+      background: var(--deep);
+      border-radius: 18px;
+      padding: 14px 16px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
+    .stat span { display: block; color: var(--muted); font-size: 13px; }
+    .stat b { display: block; margin-top: 4px; font-size: 26px; letter-spacing: -0.04em; font-weight: 680; }
+    .stack-text { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+    .stack-text p { margin: 0; }
+    #result h2 { font-size: 34px; margin-top: 6px; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 22px 28px;
+      margin-top: 18px;
+      align-items: start;
+    }
+    .outcomes, .stack { display: flex; flex-direction: column; gap: 14px; }
+    .panel {
+      background: var(--card);
+      border-radius: 24px;
+      padding: 16px 18px;
+      box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow);
+    }
+    .hero {
+      background: var(--deep);
+      border-radius: 28px;
+      padding: 18px 20px;
+      box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow);
+    }
+    .hero span { color: var(--muted); font-size: 13px; }
+    .hero b { display: block; font-size: 42px; letter-spacing: -0.045em; line-height: 1.05; margin-top: 4px; font-weight: 720; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 16px 22px; margin-top: 12px; font-size: 14px; color: var(--body); }
+    .hero-meta strong { font-weight: 680; }
+    .risk-row { display: flex; justify-content: space-between; align-items: baseline; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input[type="number"], select {
+      width: 100%;
+      border: 0;
+      border-radius: 14px;
+      background: var(--deep);
+      color: var(--ink);
+      padding: 10px 12px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--mint); }
+    .split { display: flex; justify-content: space-between; font-size: 14px; margin-top: 6px; }
+    .extremes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .extreme {
+      padding: 14px 16px;
+      background: var(--card);
+      border-radius: 22px;
+      box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow);
+    }
+    .extreme b { display: block; font-size: 28px; letter-spacing: -0.04em; font-weight: 700; color: var(--ink); }
+    .extreme.gain b, #blended, #growth, #max-gain { color: var(--mint); }
+    .extreme span { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .meter { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .meter-side { height: 8px; background: rgba(238, 245, 240, 0.08); border-radius: 999px; display: flex; overflow: hidden; }
+    .meter-side.loss { justify-content: flex-end; }
+    .meter-side .fill { height: 100%; border-radius: 999px; }
+    .meter-side.loss .fill { background: rgba(238, 245, 240, 0.85); }
+    .meter-side.gain .fill { background: var(--mint); }
+    .note { color: var(--muted); font-size: 13px; margin: 0; }
+    .warn {
+      background: rgba(79, 209, 197, 0.1);
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .choice button {
+      text-align: left;
+      background: var(--deep);
+      border: 0;
+      border-radius: 16px;
+      padding: 10px 12px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
+    .choice button small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .choice button[aria-pressed="true"] {
+      box-shadow: inset 0 0 0 1.5px var(--mint);
+    }
+    .checkline { display: flex; gap: 8px; align-items: center; color: var(--body); font-size: 14px; margin-top: 8px; }
+    .chart-wrap {
+      background: var(--card);
+      border-radius: 24px;
+      padding: 8px 8px 4px;
+      box-shadow: inset 0 0 0 1px var(--hairline), var(--shadow);
+    }
+    svg { width: 100%; height: auto; display: block; }
+    .grid { stroke: rgba(238, 245, 240, 0.12); stroke-width: 1; }
+    .tick, .axis-title { fill: rgba(238, 245, 240, 0.6); font-size: 11px; font-family: Inter, sans-serif; }
+    .line { fill: none; stroke-width: 2.25; }
+    .line.value { stroke: var(--mint); }
+    .area { fill: rgba(79, 209, 197, 0.18); stroke: none; }
+    .line.contrib { stroke: rgba(238, 245, 240, 0.45); stroke-dasharray: 4 4; }
+    .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); }
+    .swatch { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; vertical-align: top; }
+    th { font-size: 12px; color: var(--muted); font-weight: 600; }
+    tbody td { box-shadow: inset 0 -1px 0 var(--hairline); }
+    details { margin-top: 22px; }
+    summary { cursor: pointer; color: var(--muted); }
+    details p { font-size: 14px; }
+    .fund-fold {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
+    .fund-fold summary { color: var(--ink); font-weight: 600; }
+    .fund-fold h3 {
+      margin: 16px 0 0;
+      font-size: 16px;
+      font-weight: 680;
+      letter-spacing: -0.03em;
+    }
+    .fund-fold .fund-name { color: var(--mint); margin: 2px 0 0; }
+    .fund-fold p { color: var(--body); max-width: 62ch; }
+    #calc-title { margin-bottom: 4px; }
+    @media (max-width: 860px) {
+      h1 { font-size: 32px; }
+      #result h2 { font-size: 28px; }
+      .layout, .result-grid, .choice, .extremes { grid-template-columns: 1fr; }
+      .hero b { font-size: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><span></span></div>
+      <b>Equity plan</b>
+    </div>
+
+    <section id="quiz" class="stage" aria-label="Portfolio quiz">
+      <div class="card">
+        <div class="quiz-head">
+          <span id="progress" class="chip num">Question 1 of 5</span>
+          <div id="dots" class="dots" aria-hidden="true"></div>
+        </div>
+        <p id="q-kicker" class="eyebrow">Start here</p>
+        <h1 id="q-title"></h1>
+        <p id="q-help" class="lead"></p>
+        <div id="answers" class="answers" role="radiogroup"></div>
+        <div class="actions">
+          <button id="next" class="pill" type="button" disabled>Continue</button>
+          <button id="back" class="quiet" type="button" hidden>Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="result" class="stage" hidden aria-live="polite"></section>
+
+    <section id="calculator" hidden>
+      <h2 id="calc-title" class="display">Adjust this plan</h2>
+      <p class="lead">The sleeve, venue, habit, and years are filled in from the quiz. Move anything.</p>
+      <div class="layout">
+        <section class="outcomes" aria-label="Results">
+          <div class="hero">
+            <span>Projected value</span>
+            <b id="ending" class="num">S$0</b>
+            <div class="hero-meta">
+              <span>Planning rate <strong id="blended" class="num">0%</strong></span>
+              <span>You put in <strong id="contributed" class="num">S$0</strong></span>
+              <span>Growth <strong id="growth" class="num">S$0</strong></span>
+            </div>
+          </div>
+
+          <div id="bond-panel" class="panel" hidden>
+            <div class="risk-row">
+              <label for="share">Share fund</label>
+              <strong id="share-out" class="num">10%</strong>
+            </div>
+            <input id="share" type="range" min="0" max="100" step="5" value="10" aria-valuemin="0" aria-valuemax="100">
+            <div class="split">
+              <span><span id="bond-pct" class="num">90%</span> <span id="bond-name">AGGU</span></span>
+              <span class="mint"><span id="share-pct" class="num">10%</span> <span id="share-name">VWRA</span></span>
+            </div>
+            <p id="bond-note" class="note">The bond fund has no 10-year record. On the 10-year and since-1988 choices, its return is the one since November 2017.</p>
+          </div>
+
+          <div id="share-panel" class="panel">
+            <div class="risk-row">
+              <label for="risk">Nasdaq-100 sleeve</label>
+              <strong id="risk-out" class="num">20%</strong>
+            </div>
+            <input id="risk" type="range" min="0" max="45" step="1" value="20" aria-valuemin="0" aria-valuemax="45">
+            <div class="split">
+              <span><span id="core-pct" class="num">80%</span> <span id="core-name">VWRA</span></span>
+              <span class="mint"><span id="risk-pct" class="num">20%</span> <span id="risk-name">CNDX</span></span>
+            </div>
+          </div>
+
+          <div class="extremes">
+            <div class="extreme">
+              <span>Max loss</span>
+              <b id="max-loss" class="num">−0%</b>
+              <span id="max-loss-dollars"></span>
+            </div>
+            <div class="extreme gain">
+              <span>Max gain</span>
+              <b id="max-gain" class="num">+0%</b>
+              <span id="max-gain-dollars"></span>
+            </div>
+          </div>
+          <div class="meter" aria-hidden="true">
+            <div class="meter-side loss"><div id="loss-fill" class="fill"></div></div>
+            <div class="meter-side gain"><div id="gain-fill" class="fill"></div></div>
+          </div>
+          <p id="extreme-detail" class="note"></p>
+
+          <div class="panel">
+            <h2>Where you buy</h2>
+            <div class="choice" role="radiogroup" aria-label="Listing venue">
+              <button type="button" data-group="venue" data-value="lse" aria-pressed="true">
+                London
+                <small>Pay in US dollars</small>
+              </button>
+              <button type="button" data-group="venue" data-value="sgx" aria-pressed="false">
+                Singapore exchange
+                <small>Pay in Singapore dollars</small>
+              </button>
+            </div>
+            <p id="venue-note" class="note" style="margin-top:10px"></p>
+          </div>
+
+          <div class="panel">
+            <h2>How you buy</h2>
+            <div class="choice" role="radiogroup" aria-label="Buying style">
+              <button type="button" data-group="habit" data-value="recurring" aria-pressed="true">
+                Recurring
+                <small>Monthly automatic</small>
+              </button>
+              <button type="button" data-group="habit" data-value="manual" aria-pressed="false">
+                Manual
+                <small>You place each buy</small>
+              </button>
+            </div>
+            <p id="habit-note" class="note" style="margin-top:10px"></p>
+          </div>
+
+          <div class="legend">
+            <span><i class="swatch" style="background:#4fd1c5"></i>Projected value</span>
+            <span><i class="swatch" style="background:rgba(238,245,240,0.45)"></i>Money you put in</span>
+          </div>
+          <div class="chart-wrap">
+            <svg id="chart" viewBox="0 0 680 280" role="img" aria-label="Projected value and contributions by year"></svg>
+          </div>
+          <p class="note">Horizontal axis: year. Vertical axis: Singapore dollars. The history is in US dollars with no inflation adjustment, the exchange rate stays unchanged, and the contribution arrives at each month-end. Index blend <span id="gross" class="num">0%</span>, fees <span id="fee-drag" class="num">0%</span>.</p>
+
+          <div class="panel" style="padding:8px 8px 4px">
+            <table>
+              <thead>
+                <tr><th>Year</th><th>Put in</th><th>Growth</th><th>Value</th></tr>
+              </thead>
+              <tbody id="milestones"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="stack controls">
+          <div class="panel stack">
+            <div>
+              <label for="monthly">Added each month, in Singapore dollars</label>
+              <input id="monthly" class="num" type="number" min="0" step="50" value="1000">
+            </div>
+            <div>
+              <label for="start">Already invested, in Singapore dollars</label>
+              <input id="start" class="num" type="number" min="0" step="100" value="0">
+            </div>
+            <div>
+              <label for="years">Years left invested</label>
+              <input id="years" class="num" type="number" min="1" max="50" step="1" value="30">
+            </div>
+            <div>
+              <label for="window">Historical return window</label>
+              <select id="window">
+                <option value="y3">Last 3 years to 30 Sep 2026</option>
+                <option value="y5">Last 5 years to 30 Sep 2026</option>
+                <option value="y10" selected>Last 10 years to 30 Sep 2026</option>
+                <option value="long">Since 1988, no extra Nasdaq return</option>
+              </select>
+              <label class="checkline"><input id="fees" type="checkbox" checked> Subtract the fund's yearly fee</label>
+            </div>
+            <p id="window-warning" class="warn" hidden>The last three years are the AI rally. Compare the 10-year and since-1988 windows before treating this balance as a plan.</p>
+            <p id="long-note" class="note" hidden>The since-1988 rate is applied to both sleeves. The Nasdaq sleeve gets no extra return in this stress case.</p>
+            <p id="pair" class="note"></p>
+          </div>
+        </aside>
+      </div>
+
+      <details>
+        <summary>Sources, fees, and what this mix leaves out</summary>
+        <p>A 100% equity plan can fall hard. MSCI ACWI’s deepest drop on the 30 Sep 2026 factsheet was 58.06%, from October 2007 to March 2009. The calmer quiz answers use AGGU, the iShares Core Global Aggregate Bond fund (Ireland, accumulating, hedged to US dollars, yearly fee 0.10%). On the 30 Sep 2026 BlackRock factsheet, already after the fee, it returned 4.16% a year over 3 years, 0.10% a year over 5 years, and 1.52% a year since launch. The 5-year figure includes 2022, when the fund fell 11.65%. The calm-plan illustration uses the since-launch figure. Its best calendar year there is 2019 at 8.03%. It launched in November 2017, so it has no 10-year record. Its deepest week-end fall in US dollars was 15.45%, from the 7 Dec 2020 close to the 16 Oct 2022 close. The Nasdaq-100, via QQQ’s price, fell 83% from March 2000 to October 2002. Max gain uses the best sourced calendar year: 2019 for the MSCI indexes in the factsheet’s 2012–2025 table, and 1999 for the Nasdaq-100 price index (+101.95%, Slickcharts, price return). The dollar figures apply those percents to the projected ending value. They are not a forecast, and a monthly plan would have been buying during the fall.</p>
+        <p>Do not add an S&amp;P 500 fund on top. The core already holds the US market, and the Nasdaq sleeve is the extra tech weight. On 30 Sep 2026, MSCI World was 72.9% United States and 31.8% information technology. US-based VOO, QQQ, and the Singapore listing S27 withhold 30% of dividends from a Singapore investor and can fall inside US estate tax above 60,000 US dollars. The Straits Times Index (GAB or G3B) is a bank-heavy Singapore sleeve, not this core.</p>
+        <p>Broker costs on the result card are published buy fees as of 23 Sep 2026 and 2 Oct 2026 (Beansprout). They are not compounded into the projection, because a minimum charge does not grow with the balance. Currency conversion is extra. This is research, not a personal recommendation or tax advice.</p>
+      </details>
+    </section>
+  </main>
+  <script src="calc.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
