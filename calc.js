@@ -800,17 +800,11 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       `Fund cost ${formatTer(mix.ter, 3)} a year: ${parts.map((part) => `${part.pct}% ${part.etf} at ${formatTer(part.ter, 2)}`).join(" and ")}. The bond fund's figure is already after its fee. The share fund's fee is taken off the index return.`;
     const notes = [];
     if (fx === "sgd") {
-      notes.push(
-        "You preferred the Singapore exchange, but this calmer mix is a London bond fund. The buy converts Singapore dollars into US dollars. The plan has no Singapore-listed version of that bond fund.",
-      );
+      notes.push("This mix is a London bond fund. The Singapore exchange has no version of it.");
     }
-    notes.push(
-      "The illustration uses the bond fund's return since November 2017 and the share fund's 10-year return. The bond fund's 5 years to 30 Sep 2026 were 0.10% a year, because 2022 was a fall of 11.65%.",
-    );
+    notes.push("Bond fund since Nov 2017, share fund over 10 years. The 5-year figure is 0.10% because 2022 fell 11.65%.");
     if (marketId === "us") {
-      notes.push(
-        "You chose the United States, so the share fund is the S&P 500. You skip Europe, Japan, and the rest. Its yearly fee is 0.03%.",
-      );
+      notes.push("The share fund is the S&P 500. Yearly fee 0.03%.");
     }
     const projection = project({
       start: 0,
@@ -828,6 +822,7 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
       years: horizonSpec.years,
       riskWeight: 0,
       bondWeight: mix.bondW,
+      loss: lossLimit,
       rateLabel: "Bond fund since Nov 2017, share fund over 10 years",
       headline,
       market: marketId,
@@ -915,23 +910,15 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
 
   const notes = [];
   if (horizon === "under7") {
-    notes.push(
-      "You need this money in under 7 years, so the Nasdaq sleeve stays at 0%. You may need the cash before a drop has recovered.",
-    );
+    notes.push("Under 7 years, so the Nasdaq sleeve stays at 0%.");
   } else if (horizon === "mid" && horizonCapped) {
-    notes.push(
-      "A 7–15 year horizon caps the Nasdaq sleeve at 15%, because you may need the cash during a drop.",
-    );
+    notes.push("A 7–15 year horizon caps the Nasdaq sleeve at 15%.");
   }
   if (gainCapped) {
-    notes.push(
-      `A best year around ${GAIN_LABEL[gainHope]} has historically needed a heavier Nasdaq sleeve than this limit allows, so the safer weight stays.`,
-    );
+    notes.push("A higher best year needs a heavier Nasdaq sleeve, so the safer weight stays.");
   }
   if (marketId === "us") {
-    notes.push(
-      "You chose the United States, so the main fund is the S&P 500. You skip Europe, Japan, and the rest. Its yearly fee is 0.03%, against 0.12% for the world fund on the Singapore exchange.",
-    );
+    notes.push("The main fund is the S&P 500. Yearly fee 0.03%, against 0.12% for the world fund.");
   }
 
   const corePct = Math.round(rates.coreW * 100);
@@ -959,6 +946,7 @@ function suggestPlan({ loss, gain, horizon, habit, fx, currentBroker, brokerPref
     years: horizonSpec.years,
       riskWeight,
       bondWeight: 0,
+      loss: lossLimit,
       rateLabel: "10-year average after fees",
       headline,
       market: marketId,

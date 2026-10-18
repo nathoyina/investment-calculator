@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Equity plan</title>
+  <title>Investment plan</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap" rel="stylesheet">
@@ -99,17 +99,21 @@
       font-size: 13px;
       font-weight: 600;
     }
-    .dots { display: flex; gap: 6px; }
-    .dots i {
-      width: 8px;
-      height: 8px;
+    .dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .dots span {
+      width: 22px;
+      height: 22px;
       border-radius: 999px;
-      background: rgba(238, 245, 240, 0.28);
-      display: block;
+      background: rgba(238, 245, 240, 0.12);
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
     }
-    .dots i.on { background: var(--mint); }
-    .dots i.done { background: rgba(79, 209, 197, 0.45); }
-    .quiz-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .dots span.on { background: var(--mint); color: var(--deep); }
+    .dots span.done { background: rgba(79, 209, 197, 0.45); color: var(--ink); }
+    .quiz-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
     .lead { margin: 8px 0 0; max-width: 46ch; }
     .answers { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
     .answer {
@@ -143,6 +147,12 @@
     .check svg { opacity: 0; }
     .answer[aria-pressed="true"] .check svg { opacity: 1; }
     .actions { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+    #result .actions { justify-content: flex-end; margin-top: 22px; }
+    #result .quiet {
+      padding: 10px 14px;
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
     .pill {
       border: 0;
       border-radius: 999px;
@@ -251,6 +261,21 @@
     .choice button[aria-pressed="true"] {
       box-shadow: inset 0 0 0 1.5px var(--mint);
     }
+    .broker-rules { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .broker-rules li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: var(--deep);
+      border-radius: 16px;
+      padding: 10px 12px;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+      color: var(--body);
+      font-size: 14px;
+    }
+    .broker-rules li.on { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--mint); }
+    .broker-rules b { font-weight: 680; color: var(--mint); }
     .checkline { display: flex; gap: 8px; align-items: center; color: var(--body); font-size: 14px; margin-top: 8px; }
     .chart-wrap {
       background: var(--card);
@@ -289,12 +314,19 @@
     }
     .fund-fold .fund-name { color: var(--mint); margin: 2px 0 0; }
     .fund-fold p { color: var(--body); max-width: 62ch; }
-    #calc-title { margin-bottom: 4px; }
+    #calculator {
+      margin-top: 56px;
+      padding-top: 32px;
+      border-top: 1px solid var(--hairline);
+    }
+    #calc-title { font-size: 28px; margin-bottom: 4px; }
     @media (max-width: 860px) {
       h1 { font-size: 32px; }
       #result h2 { font-size: 28px; }
       .layout, .result-grid, .choice, .extremes { grid-template-columns: 1fr; }
       .hero b { font-size: 34px; }
+      #calculator { margin-top: 40px; padding-top: 24px; }
+      #calc-title { font-size: 26px; }
     }
   </style>
 </head>
@@ -302,7 +334,7 @@
   <main>
     <div class="brand">
       <div class="mark" aria-hidden="true"><span></span></div>
-      <b>Equity plan</b>
+      <b>Investment plan</b>
     </div>
 
     <section id="quiz" class="stage" aria-label="Portfolio quiz">
@@ -326,7 +358,7 @@
 
     <section id="calculator" hidden>
       <h2 id="calc-title" class="display">Adjust this plan</h2>
-      <p class="lead">The sleeve, venue, habit, and years are filled in from the quiz. Move anything.</p>
+      <p class="lead">Main fund and where you buy change the funds in the mix.</p>
       <div class="layout">
         <section class="outcomes" aria-label="Results">
           <div class="hero">
@@ -336,6 +368,57 @@
               <span>Planning rate <strong id="blended" class="num">0%</strong></span>
               <span>You put in <strong id="contributed" class="num">S$0</strong></span>
               <span>Growth <strong id="growth" class="num">S$0</strong></span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Main fund</h2>
+            <div class="choice" role="radiogroup" aria-label="Main fund market">
+              <button type="button" data-group="market" data-value="global" aria-pressed="true">
+                Worldwide
+                <small>Developed markets</small>
+              </button>
+              <button type="button" data-group="market" data-value="us" aria-pressed="false">
+                United States
+                <small>S&amp;P 500</small>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Where you buy</h2>
+            <div class="choice" role="radiogroup" aria-label="Listing venue">
+              <button type="button" data-group="venue" data-value="lse" aria-pressed="true">
+                London
+                <small>Pay in US dollars</small>
+              </button>
+              <button type="button" data-group="venue" data-value="sgx" aria-pressed="false">
+                Singapore exchange
+                <small>Pay in Singapore dollars</small>
+              </button>
+            </div>
+            <p id="venue-note" class="note" style="margin-top:10px"></p>
+          </div>
+
+          <div class="panel">
+            <h2>Risk appetite</h2>
+            <div class="choice" role="radiogroup" aria-label="Risk appetite">
+              <button type="button" data-group="loss" data-value="0.2" aria-pressed="false">
+                About 20%
+                <small>Mostly the bond fund</small>
+              </button>
+              <button type="button" data-group="loss" data-value="0.4" aria-pressed="false">
+                About 40%
+                <small>Shares and the bond fund</small>
+              </button>
+              <button type="button" data-group="loss" data-value="0.6" aria-pressed="false">
+                About 60%
+                <small>Almost all shares</small>
+              </button>
+              <button type="button" data-group="loss" data-value="0.8" aria-pressed="true">
+                About 80%
+                <small>Larger Nasdaq slice</small>
+              </button>
             </div>
           </div>
 
@@ -383,35 +466,6 @@
           <p id="extreme-detail" class="note"></p>
 
           <div class="panel">
-            <h2>Main fund</h2>
-            <div class="choice" role="radiogroup" aria-label="Main fund market">
-              <button type="button" data-group="market" data-value="global" aria-pressed="true">
-                Worldwide
-                <small>Developed markets</small>
-              </button>
-              <button type="button" data-group="market" data-value="us" aria-pressed="false">
-                United States
-                <small>S&amp;P 500</small>
-              </button>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h2>Where you buy</h2>
-            <div class="choice" role="radiogroup" aria-label="Listing venue">
-              <button type="button" data-group="venue" data-value="lse" aria-pressed="true">
-                London
-                <small>Pay in US dollars</small>
-              </button>
-              <button type="button" data-group="venue" data-value="sgx" aria-pressed="false">
-                Singapore exchange
-                <small>Pay in Singapore dollars</small>
-              </button>
-            </div>
-            <p id="venue-note" class="note" style="margin-top:10px"></p>
-          </div>
-
-          <div class="panel">
             <h2>How you buy</h2>
             <div class="choice" role="radiogroup" aria-label="Buying style">
               <button type="button" data-group="habit" data-value="recurring" aria-pressed="true">
@@ -426,6 +480,12 @@
             <p id="habit-note" class="note" style="margin-top:10px"></p>
           </div>
 
+          <div class="panel">
+            <h2>Brokerage</h2>
+            <p id="broker-now" class="note"></p>
+            <ul id="broker-rules" class="broker-rules"></ul>
+          </div>
+
           <div class="legend">
             <span><i class="swatch" style="background:#4fd1c5"></i>Projected value</span>
             <span><i class="swatch" style="background:rgba(238,245,240,0.45)"></i>Money you put in</span>
@@ -433,7 +493,7 @@
           <div class="chart-wrap">
             <svg id="chart" viewBox="0 0 680 280" role="img" aria-label="Projected value and contributions by year"></svg>
           </div>
-          <p class="note">Horizontal axis: year. Vertical axis: Singapore dollars. The history is in US dollars with no inflation adjustment, the exchange rate stays unchanged, and the contribution arrives at each month-end. Index blend <span id="gross" class="num">0%</span>, fees <span id="fee-drag" class="num">0%</span>.</p>
+          <p class="note">Exchange rate stays flat. Index <span id="gross" class="num">0%</span>, fee <span id="fee-drag" class="num">0%</span>.</p>
 
           <div class="panel" style="padding:8px 8px 4px">
             <table>

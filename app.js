@@ -3,10 +3,10 @@ const { MAX_RISK, bondMixRates, chartTicks, formatPct, formatSgd, planRates, pro
 const $ = (id) => document.getElementById(id);
 
 const VENUE_NOTES = {
-  lse: "London, in US dollars: VWRA and CNDX. Both are based in Ireland, so US dividends inside the fund are withheld at 15%, and the holding generally sits outside US estate tax. You convert Singapore dollars on each buy. The core includes emerging markets. These lines are large, so the gap between buy and sell prices is usually tight.",
-  sgx: "Singapore exchange, in Singapore dollars: XWR and XND. They are based in Ireland too, so US withholding and estate-tax treatment match the London funds. You skip the currency conversion, but the Singapore-dollar price still moves with the US dollar. The core leaves out emerging markets. The gap between buy and sell prices can be wider, and the US market is closed while the Singapore exchange is open.",
-  "us:lse": "London, in US dollars: XDPU and CNDX. Both are based in Ireland, so US dividends inside the fund are withheld at 15%, and the holding generally sits outside US estate tax. You convert Singapore dollars on each buy. The main fund is the S&P 500, so it leaves out Europe, Japan, and the rest.",
-  "us:sgx": "Singapore exchange, in Singapore dollars: XUS and XND. They are based in Ireland too, so US withholding and estate-tax treatment match the London fund. You skip the currency conversion, but the Singapore-dollar price still moves with the US dollar. The main fund is the S&P 500, so it leaves out Europe, Japan, and the rest. The gap between buy and sell prices can be wider, and the US market is closed while the Singapore exchange is open.",
+  lse: "VWRA and CNDX. Pay in US dollars.",
+  sgx: "XWR and XND. Pay in Singapore dollars.",
+  "us:lse": "XDPU and CNDX. Pay in US dollars. S&P 500 only.",
+  "us:sgx": "XUS and XND. Pay in Singapore dollars. S&P 500 only.",
 };
 
 function venueNote(venue, market) {
@@ -15,11 +15,17 @@ function venueNote(venue, market) {
 }
 
 const HABIT_NOTES = {
-  recurring:
-    "The buy goes through every month, including after a sharp drop, so the Nasdaq sleeve gets bought when it is cheapest. You do not set that day’s price.",
-  manual:
-    "You choose the day and can set a limit price. The risk is skipping the month when the Nasdaq sleeve is down. This projection still assumes every month is invested.",
+  recurring: "Buys every month, including after a drop.",
+  manual: "You choose the day and the price.",
 };
+
+const BROKER_RULES = [
+  { id: "recurring:lse", label: "Automatic, London", broker: "FSM Global", fee: "0% buy" },
+  { id: "recurring:sgx", label: "Automatic, Singapore exchange", broker: "FSM Global", fee: "0% buy" },
+  { id: "manual:lse", label: "Each buy yourself, London", broker: "Interactive Brokers", fee: "0.05%, min £1" },
+  { id: "manual:sgx", label: "Each buy yourself, Singapore exchange", broker: "Longbridge", fee: "0% commission, 0.03% platform" },
+  { id: "bond", label: "Bond fund, London", broker: "Interactive Brokers", fee: "0.05%, min £1" },
+];
 
 const QUESTIONS = [
   {
@@ -47,7 +53,7 @@ const QUESTIONS = [
   {
     kicker: "Market",
     title: "Where should the main fund invest?",
-    help: "The fee is the small part. The US fund costs 0.03% a year. The world fund on the Singapore exchange costs 0.12%. The choice is the countries in the fund.",
+    help: "US fund 0.03% a year. World fund 0.12%. Choose the countries.",
     key: "market",
     options: [
       { value: "global", label: "Worldwide", detail: "US companies, plus Europe, Japan, and other developed markets" },
@@ -144,6 +150,8 @@ const state = {
   habit: "recurring",
   mix: "equity",
   market: "global",
+  loss: "0.8",
+  horizon: "long",
 };
 
 const quiz = {
@@ -176,14 +184,52 @@ function setPressed(group, value) {
 }
 
 function habitNote() {
-  let text = HABIT_NOTES[state.habit];
-  if (state.venue === "sgx" && state.habit === "recurring") {
-    text += " On a new Singapore-exchange line, confirm the automatic order is not paying a wide gap between buy and sell prices every month.";
+  return HABIT_NOTES[state.habit];
+}
+
+function horizonForYears(years) {
+  if (years < 7) return "under7";
+  if (years <= 15) return "mid";
+  return "long";
+}
+
+function applyAppetite() {
+  const years = readNumber($("years"), 20);
+  state.horizon = horizonForYears(years);
+  const plan = suggestPlan({
+    loss: Number(state.loss),
+    horizon: state.horizon,
+    habit: state.habit,
+    fx: state.venue === "sgx" ? "sgd" : "both",
+    market: state.market,
+    currentBroker: "none",
+  });
+  if (!plan.fits) return;
+  state.mix = plan.bondWeight ? "bond" : "equity";
+  if (plan.bondWeight) state.venue = "lse";
+  $("risk").value = String(Math.round((plan.riskWeight || 0) * 100));
+  $("share").value = String(Math.round((1 - (plan.bondWeight || 0)) * 100));
+  render();
+}
+
+function renderBroker(bondMix) {
+  const active = bondMix ? "bond" : `${state.habit}:${state.venue}`;
+  const list = $("broker-rules");
+  list.replaceChildren();
+  for (const rule of BROKER_RULES) {
+    const item = document.createElement("li");
+    if (rule.id === active) item.className = "on";
+    const label = document.createElement("span");
+    label.textContent = rule.label;
+    const pick = document.createElement("b");
+    pick.textContent = `${rule.broker} · ${rule.fee}`;
+    item.append(label, pick);
+    list.append(item);
   }
-  if (state.venue === "sgx" && state.habit === "manual") {
-    text += " A limit order matters more on the Singapore exchange while these lines are still finding a gap between buy and sell prices.";
-  }
-  return text;
+  const current = BROKER_RULES.find((rule) => rule.id === active);
+  $("broker-now").textContent = current
+    ? `${current.broker}. ${current.fee}.`
+    : "";
 }
 
 function renderQuiz() {
@@ -213,10 +259,11 @@ function renderQuiz() {
   const dots = $("dots");
   dots.replaceChildren();
   list.forEach((_, index) => {
-    const dot = document.createElement("i");
-    if (index === quiz.step) dot.className = "on";
-    else if (index < quiz.step) dot.className = "done";
-    dots.append(dot);
+    const step = document.createElement("span");
+    step.textContent = String(index + 1);
+    if (index === quiz.step) step.className = "on";
+    else if (index < quiz.step) step.className = "done";
+    dots.append(step);
   });
 
   const box = $("answers");
@@ -297,8 +344,6 @@ function showResult(plan) {
   if (plan.fits) {
     const grid = document.createElement("div");
     grid.className = "result-grid";
-    const lossDollars = formatSgd(plan.projection.balance * plan.maxLoss);
-    const gainDollars = formatSgd(plan.projection.balance * plan.maxGain);
     const stats = [
       [plan.rateLabel, formatPct(plan.annual), true],
       plan.longAnnual == null ? null : ["Since 1988, no Nasdaq premium", formatPct(plan.longAnnual), true],
@@ -320,16 +365,11 @@ function showResult(plan) {
 
     const copy = document.createElement("div");
     copy.className = "stack-text";
+    const brokerSentences = plan.broker.why.split(/(?<=[.!])\s+/).slice(0, 2).join(" ");
     const lines = [
-      `S$1,000 a month for ${plan.years} years reaches ${formatSgd(plan.projection.balance)}. Max loss is ${lossDollars} off that value. Max gain is ${gainDollars} on it.`,
+      `S$1,000 a month for ${plan.years} years: ${formatSgd(plan.projection.balance)}.`,
       ...plan.notes,
-      plan.fxNote,
-      plan.flatNote,
-      plan.fundLine,
-      `${plan.broker.name}. ${plan.broker.why}`,
-      plan.broker.alt,
-      plan.broker.confirm,
-      "Research, not a personal recommendation.",
+      brokerSentences,
     ].filter(Boolean);
     for (const line of lines) {
       const p = document.createElement("p");
@@ -343,14 +383,6 @@ function showResult(plan) {
 
   const actions = document.createElement("div");
   actions.className = "actions";
-  if (plan.fits) {
-    const adjust = document.createElement("button");
-    adjust.type = "button";
-    adjust.className = "pill";
-    adjust.textContent = "See or adjust this plan";
-    adjust.addEventListener("click", () => openCalculator(plan));
-    actions.append(adjust);
-  }
   const again = document.createElement("button");
   again.type = "button";
   again.className = "quiet";
@@ -359,7 +391,7 @@ function showResult(plan) {
   actions.append(again);
   card.append(actions);
   result.append(card);
-  if (plan.fits) openCalculator(plan, { scroll: false });
+  if (plan.fits) openCalculator(plan);
   result.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -388,7 +420,7 @@ function renderFundDetails(plan) {
   return fold;
 }
 
-function openCalculator(plan, { scroll = true } = {}) {
+function openCalculator(plan) {
   $("years").value = String(plan.years);
   $("risk").value = String(Math.round(plan.riskWeight * 100));
   $("share").value = String(Math.round((1 - (plan.bondWeight || 0)) * 100));
@@ -400,9 +432,10 @@ function openCalculator(plan, { scroll = true } = {}) {
   state.market = plan.market === "us" ? "us" : "global";
   state.venue = plan.venueId;
   state.habit = plan.habit;
+  state.loss = Number(plan.loss || 0.8).toFixed(1);
+  state.horizon = horizonForYears(plan.years);
   $("calculator").hidden = false;
   render();
-  if (scroll) $("calculator").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function resetQuiz() {
@@ -500,15 +533,19 @@ function render() {
   $("gain-fill").style.width = `${Math.min(100, rates.maxGain * 100)}%`;
 
   $("venue-note").textContent = bondMix
-    ? `London, in US dollars: AGGU and ${rates.equity.etf}. AGGU is the global bond fund. Both are based in Ireland. You convert Singapore dollars on each buy. Choosing the Singapore exchange leaves the bond fund behind, because it is not listed there.`
-    : venueNote(state.venue, state.market);
+    ? `AGGU and ${rates.equity.etf}. London only.`
+    : state.mix === "bond"
+      ? `${venueNote(state.venue, state.market)} The bond fund is London only, so this is a share plan.`
+      : venueNote(state.venue, state.market);
   $("habit-note").textContent = habitNote();
   $("long-note").textContent = rates.longUsesTenYear
-    ? "The since-1988 choice uses the 10-year S&P 500 return for both sleeves, because the 30 Sep 2026 factsheet used here has no since-1988 S&P 500 figure. The Nasdaq sleeve gets no extra return in this stress case."
-    : "The since-1988 rate is applied to both sleeves. The Nasdaq sleeve gets no extra return in this stress case.";
+    ? "Since-1988 uses the 10-year S&P 500 return. No extra Nasdaq return."
+    : "Since-1988 applies to both sleeves. No extra Nasdaq return.";
+  renderBroker(bondMix);
   setPressed("venue", state.venue);
   setPressed("habit", state.habit);
   setPressed("market", state.market);
+  setPressed("loss", state.loss);
 
   $("window-warning").hidden = !rates.caution;
   $("long-note").hidden = rates.windowKey !== "long";
@@ -600,12 +637,22 @@ $("back").addEventListener("click", () => {
   renderQuiz();
 });
 for (const id of ["start", "monthly", "years", "risk", "share", "window", "fees"]) {
-  $(id).addEventListener("input", render);
+  $(id).addEventListener("input", () => {
+    if (id === "years") {
+      const bucket = horizonForYears(readNumber($("years"), 20));
+      if (bucket !== state.horizon) {
+        applyAppetite();
+        return;
+      }
+    }
+    render();
+  });
 }
 for (const button of document.querySelectorAll("#calculator [data-group]")) {
   button.addEventListener("click", () => {
     state[button.dataset.group] = button.dataset.value;
-    render();
+    if (button.dataset.group === "loss" || button.dataset.group === "market") applyAppetite();
+    else render();
   });
 }
 render();

@@ -181,7 +181,7 @@ test("under 7 years forces a 0% sleeve and leads with that warning", () => {
   assert.equal(plan.riskWeight, 0);
   assert.equal(plan.years, 5);
   assert.equal(plan.headline, "100% VWRA");
-  assert.match(plan.message, /under 7 years/);
+  assert.match(plan.message, /Under 7 years/);
   assert.equal(plan.broker.id, "ibkr");
   assert.match(plan.broker.why, /0\.05%/);
   assert.match(plan.broker.why, /£1/);
